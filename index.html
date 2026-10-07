@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Employee Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F4F6F8;--panel:#fff;--ink:#151A21;--sub:#5B6570;--line:#E2E6EA;--accent:#3B6E8F;--good:#1F7A5C;--warn:#C7862F;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;font-size:15px}
+.wrap{max-width:920px;margin:0 auto;padding:36px 20px 60px}
+h1{font-family:'Space Grotesk',sans-serif;font-size:22px;margin:0}
+.hidden{display:none}
+#login{max-width:340px;margin:120px auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:28px}
+#login input{width:100%;padding:10px;margin:8px 0;border:1px solid var(--line);border-radius:6px;font-size:14px}
+#login button,.logout{background:var(--accent);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:14px}
+#loginError{color:#B3261E;font-size:13px;min-height:18px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+@media(max-width:700px){.grid{grid-template-columns:repeat(2,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.card .label{font-size:12.5px;color:var(--sub);margin-bottom:8px}
+.card .num{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:600}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11.5px;color:var(--sub);padding:0 10px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid var(--line)}
+.pill{font-size:11.5px;padding:3px 9px;border-radius:20px;font-weight:500}
+.booked{background:rgba(31,122,92,.13);color:var(--good)}
+.replied{background:rgba(59,110,143,.13);color:var(--accent)}
+.review{background:rgba(199,134,47,.15);color:var(--warn)}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h1>Employee Login</h1>
+  <input id="user" placeholder="Username" autocomplete="username">
+  <input id="pass" type="password" placeholder="Password" autocomplete="current-password">
+  <div id="loginError"></div>
+  <button onclick="login()">Sign in</button>
+</div>
+
+<div id="dashboard" class="wrap hidden">
+  <header>
+    <h1>Lead Response Dashboard</h1>
+    <button class="logout" onclick="logout()">Sign out</button>
+  </header>
+  <div class="grid">
+    <div class="card"><div class="label">Leads processed</div><div class="num" id="mProcessed">–</div></div>
+    <div class="card"><div class="label">Booked</div><div class="num" id="mBooked">–</div></div>
+    <div class="card"><div class="label">Needs review</div><div class="num" id="mReview">–</div></div>
+    <div class="card"><div class="label">Avg. response</div><div class="num" id="mResponse">–</div></div>
+  </div>
+  <div class="panel">
+    <table>
+      <tr><th>Lead</th><th>Received</th><th>Outcome</th><th>Status</th></tr>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function login(){
+  const username = document.getElementById('user').value;
+  const password = document.getElementById('pass').value;
+  fetch('/api/login', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({username, password})
+  }).then(r => r.json()).then(d => {
+    if (d.token) {
+      sessionStorage.setItem('token', d.token);
+      showDashboard();
+    } else {
+      document.getElementById('loginError').textContent = 'Invalid username or password';
+    }
+  }).catch(() => {
+    document.getElementById('loginError').textContent = 'Login failed — try again';
+  });
+}
+
+function logout(){
+  sessionStorage.removeItem('token');
+  document.getElementById('dashboard').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
+}
+
+function showDashboard(){
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  loadData();
+}
+
+function loadData(){
+  const token = sessionStorage.getItem('token');
+  fetch('/api/data', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => { if (!r.ok) throw new Error('unauthorized'); return r.json(); })
+    .then(d => render(d.records))
+    .catch(() => logout());
+}
+
+function render(records){
+  document.getElementById('mProcessed').textContent = records.length;
+  const booked = records.filter(r => r.fields.Status === 'Booked').length;
+  const review = records.filter(r => r.fields.Status === 'Needs Review').length;
+  document.getElementById('mBooked').textContent = booked;
+  document.getElementById('mReview').textContent = review;
+  const times = records.map(r => r.fields.ResponseTimeSeconds).filter(Boolean);
+  document.getElementById('mResponse').textContent = times.length
+    ? Math.round(times.reduce((a,b)=>a+b,0)/times.length) + 's' : '—';
+
+  const rows = document.getElementById('rows');
+  rows.innerHTML = records.slice(0,10).map(r => {
+    const f = r.fields;
+    const cls = f.Status === 'Booked' ? 'booked' : f.Status === 'Needs Review' ? 'review' : 'replied';
+    return `<tr><td>${f.Name||''}</td><td>${f.Received||''}</td><td>${f.Outcome||''}</td><td><span class="pill ${cls}">${f.Status||''}</span></td></tr>`;
+  }).join('');
+}
+
+// Stay logged in on refresh within the session
+if (sessionStorage.getItem('token')) showDashboard();
+</script>
+</body>
+</html>
