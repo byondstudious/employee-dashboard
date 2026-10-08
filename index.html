@@ -115,7 +115,7 @@ function render(records){
   rows.innerHTML = records.slice(0,10).map(r => {
     const f = r.fields;
     const cls = f.Status === 'Booked' ? 'booked' : f.Status === 'Needs Review' ? 'review' : 'replied';
-    return `<tr><td>${f.Name||''}</td><td>${f.Received||''}</td><td>${f.Outcome||''}</td><td><span class="pill ${cls}">${f.Status||''}</span></td></tr>`;
+    return `<tr><td>${f.Name||''}</td><td>${f.Received ? new Date(f.Received).toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : ''}</td><td>${f.Outcome||''}</td><td><span class="pill ${cls}">${f.Status||''}</span></td></tr>`;
   }).join('');
 }
 
