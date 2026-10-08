@@ -26,7 +26,10 @@ export default async function handler(req, res) {
     headers: { Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}` }
   });
 
-  if (!airtableRes.ok) return res.status(502).json({ error: 'Failed to fetch data' });
+     if (!airtableRes.ok) {
+     const detail = await airtableRes.text();
+     return res.status(502).json({ error: 'Failed to fetch data', status: airtableRes.status, detail });
+   }
 
   const data = await airtableRes.json();
   res.status(200).json({ records: data.records });
